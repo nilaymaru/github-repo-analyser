@@ -23,6 +23,9 @@ const octokit = new Octokit({
   userAgent: 'github-repo-analyzer v1.0.0'
 });
 
+// Constants for issue analysis
+const STALE_THRESHOLD_DAYS = 30; // Issues with no updates for 30+ days are considered stale
+
 /**
  * Parse GitHub repository information from various input formats
  * @param {string} input - Repository input (URL or owner/repo)
@@ -537,7 +540,10 @@ export async function getRepositoryCommits(owner, repo) {
     // Cache the processed data
     cache.set(cacheKey, processedData);
 
-    return processedData;
+    return {
+      data: processedData,
+      source: 'api'
+    };
   } catch (error) {
     console.error(`[getRepositoryCommits] Error fetching commits:`, error);
     throw error;
@@ -825,6 +831,364 @@ async function fetchAllCommits(owner, repo) {
   return commits;
 }
 
+/**
+ * Get repository issues with caching (medium priority)
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {Object} options - Optional parameters
+ * @returns {Promise<Object>} Issue data and metrics
+ */
+export async function getRepositoryIssues(owner, repo, options = {}) {
+  const cacheKey = generateCacheKey('issues', owner, repo);
+  console.log(`[getRepositoryIssues] Getting issues for ${owner}/${repo}`);
+
+  // Check cache first
+  const cachedData = cache.get(cacheKey);
+  if (cachedData) {
+    cacheHits++;
+    console.log(`[getRepositoryIssues] Cache HIT for ${cacheKey}`);
+    return {
+      data: cachedData,
+      source: 'cache'
+    };
+  }
+
+  try {
+    cacheMisses++;
+    console.log(`[getRepositoryIssues] Cache MISS for ${cacheKey}`);
+
+    // Fetch all issues (both open and closed)
+    const issues = [];
+    let page = 1;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const response = await octokit.issues.listForRepo({
+        owner,
+        repo,
+        state: 'all', // Get both open and closed issues
+        per_page: 100,
+        page
+      });
+
+      // Filter out pull requests (GitHub API returns PRs as issues)
+      const filteredIssues = response.data.filter(issue => !issue.pull_request);
+      issues.push(...filteredIssues);
+
+      hasNextPage = response.headers.link?.includes('rel="next"');
+      page++;
+
+      // Break after 5 pages to avoid rate limiting for large repos
+      if (page > 5) break;
+    }
+
+    console.log(`[getRepositoryIssues] Fetched ${issues.length} issues`);
+
+    // Process issues data
+    const now = new Date();
+    const openIssues = issues.filter(issue => issue.state === 'open');
+    const closedIssues = issues.filter(issue => issue.state === 'closed');
+
+    // Calculate time to close for closed issues
+    const timeToCloseData = closedIssues.map(issue => {
+      const created = new Date(issue.created_at);
+      const closed = new Date(issue.closed_at);
+      return {
+        number: issue.number,
+        title: issue.title,
+        timeToClose: (closed - created) / (1000 * 60 * 60 * 24), // in days
+        created_at: issue.created_at,
+        closed_at: issue.closed_at
+      };
+    });
+
+    // Sort by time to close
+    timeToCloseData.sort((a, b) => a.timeToClose - b.timeToClose);
+
+    // Calculate time to close statistics
+    const timeToCloseValues = timeToCloseData.map(i => i.timeToClose);
+    const timeToCloseAvg = timeToCloseValues.length > 0 ? 
+      timeToCloseValues.reduce((sum, val) => sum + val, 0) / timeToCloseValues.length : 0;
+
+    // Calculate median (middle value)
+    let timeToCloseMedian = 0;
+    if (timeToCloseValues.length > 0) {
+      const sorted = [...timeToCloseValues].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      timeToCloseMedian = sorted.length % 2 === 0 ? 
+        (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+    }
+
+    // Find stale issues (no updates for 30+ days)
+    const staleIssues = openIssues.filter(issue => {
+      const lastUpdated = new Date(issue.updated_at);
+      const daysSinceUpdate = (now - lastUpdated) / (1000 * 60 * 60 * 24);
+      return daysSinceUpdate >= STALE_THRESHOLD_DAYS;
+    });
+
+    // Sort issues by comment count
+    const issuesByComments = [...issues].sort((a, b) => b.comments - a.comments);
+
+    // Prepare processed data
+    const processedData = {
+      allIssues: issues.map(issue => ({
+        number: issue.number,
+        title: issue.title,
+        state: issue.state,
+        created_at: issue.created_at,
+        closed_at: issue.closed_at,
+        updated_at: issue.updated_at,
+        comments: issue.comments,
+        user: issue.user.login,
+        labels: issue.labels.map(label => label.name)
+      })),
+      metrics: {
+        openCount: openIssues.length,
+        closedCount: closedIssues.length,
+        timeToClose: {
+          average: timeToCloseAvg,
+          median: timeToCloseMedian,
+          min: Math.min(...timeToCloseValues) || 0,
+          max: Math.max(...timeToCloseValues) || 0,
+          data: timeToCloseData
+        },
+        staleIssues: staleIssues.map(issue => ({
+          number: issue.number,
+          title: issue.title,
+          daysSinceUpdate: Math.floor((now - new Date(issue.updated_at)) / (1000 * 60 * 60 * 24)),
+          created_at: issue.created_at,
+          updated_at: issue.updated_at
+        })),
+        mostCommented: issuesByComments.slice(0, 10).map(issue => ({
+          number: issue.number,
+          title: issue.title,
+          comments: issue.comments,
+          state: issue.state,
+          created_at: issue.created_at
+        }))
+      }
+    };
+
+    // Cache the processed data
+    cache.set(cacheKey, processedData);
+
+    return {
+      data: processedData,
+      source: 'api'
+    };
+  } catch (error) {
+    console.error(`[getRepositoryIssues] Error:`, error);
+    if (error.status === 404) {
+      return {
+        data: {
+          allIssues: [],
+          metrics: {
+            openCount: 0,
+            closedCount: 0,
+            timeToClose: {
+              average: 0,
+              median: 0,
+              min: 0,
+              max: 0,
+              data: []
+            },
+            staleIssues: [],
+            mostCommented: []
+          }
+        },
+        message: 'Repository not found'
+      };
+    }
+    throw new Error(`Failed to fetch issues: ${error.message}`);
+  }
+}
+
+/**
+ * Get repository pull requests with caching (medium priority)
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @returns {Promise<Object>} Pull request data and metrics
+ */
+export async function getRepositoryPullRequests(owner, repo) {
+  const cacheKey = generateCacheKey('prs', owner, repo);
+  console.log(`[getRepositoryPullRequests] Getting PRs for ${owner}/${repo}`);
+
+  // Check cache first
+  const cachedData = cache.get(cacheKey);
+  if (cachedData) {
+    cacheHits++;
+    console.log(`[getRepositoryPullRequests] Cache HIT for ${cacheKey}`);
+    return {
+      data: cachedData,
+      source: 'cache'
+    };
+  }
+
+  try {
+    cacheMisses++;
+    console.log(`[getRepositoryPullRequests] Cache MISS for ${cacheKey}`);
+
+    // Fetch all pull requests
+    const pullRequests = [];
+    let page = 1;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const response = await octokit.pulls.list({
+        owner,
+        repo,
+        state: 'all', // Get both open and closed PRs
+        per_page: 100,
+        page
+      });
+
+      pullRequests.push(...response.data);
+
+      hasNextPage = response.headers.link?.includes('rel="next"');
+      page++;
+
+      // Break after 5 pages to avoid rate limiting for large repos
+      if (page > 5) break;
+    }
+
+    console.log(`[getRepositoryPullRequests] Fetched ${pullRequests.length} PRs`);
+
+    // Get additional data for each PR (reviews)
+    const pullRequestsWithReviews = await Promise.all(
+      pullRequests.slice(0, 30).map(async (pr) => { // Limit to 30 PRs to avoid rate limiting
+        try {
+          const reviews = await octokit.pulls.listReviews({
+            owner,
+            repo,
+            pull_number: pr.number
+          });
+
+          return {
+            ...pr,
+            reviews: reviews.data
+          };
+        } catch (error) {
+          console.error(`Error fetching reviews for PR #${pr.number}:`, error);
+          return {
+            ...pr,
+            reviews: []
+          };
+        }
+      })
+    );
+
+    // Process pull request data
+    const mergedPRs = pullRequestsWithReviews.filter(pr => pr.merged_at);
+    const openPRs = pullRequestsWithReviews.filter(pr => pr.state === 'open');
+
+    // Calculate merge time for merged PRs
+    const mergeTimeData = mergedPRs.map(pr => {
+      const created = new Date(pr.created_at);
+      const merged = new Date(pr.merged_at);
+      return {
+        number: pr.number,
+        title: pr.title,
+        mergeTime: (merged - created) / (1000 * 60 * 60 * 24), // in days
+        created_at: pr.created_at,
+        merged_at: pr.merged_at
+      };
+    });
+
+    // Calculate merge time statistics
+    const mergeTimeValues = mergeTimeData.map(pr => pr.mergeTime);
+    const mergeTimeAvg = mergeTimeValues.length > 0 ? 
+      mergeTimeValues.reduce((sum, val) => sum + val, 0) / mergeTimeValues.length : 0;
+
+    // Calculate 95th percentile
+    let percentile95 = 0;
+    if (mergeTimeValues.length > 0) {
+      const sorted = [...mergeTimeValues].sort((a, b) => a - b);
+      const index = Math.ceil(sorted.length * 0.95) - 1;
+      percentile95 = sorted[index >= 0 ? index : 0];
+    }
+
+    // Count reviews per reviewer
+    const reviewers = {};
+    pullRequestsWithReviews.forEach(pr => {
+      if (pr.reviews && pr.reviews.length > 0) {
+        pr.reviews.forEach(review => {
+          const reviewer = review.user.login;
+          if (!reviewers[reviewer]) {
+            reviewers[reviewer] = {
+              count: 0,
+              prs: []
+            };
+          }
+          reviewers[reviewer].count++;
+          if (!reviewers[reviewer].prs.includes(pr.number)) {
+            reviewers[reviewer].prs.push(pr.number);
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort by review count
+    const reviewersArray = Object.entries(reviewers).map(([name, data]) => ({
+      name,
+      reviewCount: data.count,
+      prCount: data.prs.length
+    })).sort((a, b) => b.reviewCount - a.reviewCount);
+
+    // Prepare processed data
+    const processedData = {
+      allPullRequests: pullRequestsWithReviews.map(pr => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.state,
+        created_at: pr.created_at,
+        merged_at: pr.merged_at,
+        closed_at: pr.closed_at,
+        user: pr.user.login,
+        reviewCount: pr.reviews ? pr.reviews.length : 0
+      })),
+      metrics: {
+        openCount: openPRs.length,
+        mergedCount: mergedPRs.length,
+        mergeTime: {
+          average: mergeTimeAvg,
+          percentile95: percentile95,
+          data: mergeTimeData
+        },
+        reviewers: reviewersArray
+      }
+    };
+
+    // Cache the processed data
+    cache.set(cacheKey, processedData);
+
+    return {
+      data: processedData,
+      source: 'api'
+    };
+  } catch (error) {
+    console.error(`[getRepositoryPullRequests] Error:`, error);
+    if (error.status === 404) {
+      return {
+        data: {
+          allPullRequests: [],
+          metrics: {
+            openCount: 0,
+            mergedCount: 0,
+            mergeTime: {
+              average: 0,
+              percentile95: 0,
+              data: []
+            },
+            reviewers: []
+          }
+        },
+        message: 'Repository not found'
+      };
+    }
+    throw new Error(`Failed to fetch pull requests: ${error.message}`);
+  }
+}
+
 // Export all functions
 export default {
   testGitHubAPI,
@@ -836,5 +1200,7 @@ export default {
   getRepositoryContributors,
   getRepositoryCommits,
   getRepositoryLanguages,
-  getRepositoryFiles
+  getRepositoryFiles,
+  getRepositoryIssues,
+  getRepositoryPullRequests
 };

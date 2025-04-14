@@ -8,7 +8,9 @@ import {
   getRepositoryContributors,
   getRepositoryCommits,
   getRepositoryLanguages,
-  getRepositoryFiles
+  getRepositoryFiles,
+  getRepositoryIssues,
+  getRepositoryPullRequests
 } from './github.js';
 
 const router = express.Router();
@@ -276,6 +278,66 @@ router.post('/cache/clear', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: error.message
+    });
+  }
+});
+
+// Issues routes
+router.get('/api/issues', async (req, res) => {
+  try {
+    const { owner, repo } = req.query;
+    console.log(`[/api/issues] Fetching issues for ${owner}/${repo}`);
+    
+    if (!owner || !repo) {
+      console.error('[/api/issues] Missing owner or repo');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Owner and repo parameters are required'
+      });
+    }
+
+    const issues = await getRepositoryIssues(owner, repo);
+    console.log('[/api/issues] Response:', issues);
+
+    res.json({
+      status: 'success',
+      data: issues.data
+    });
+  } catch (error) {
+    console.error('[/api/issues] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: `Failed to fetch issues: ${error.message}`
+    });
+  }
+});
+
+// Pull requests routes
+router.get('/api/pull-requests', async (req, res) => {
+  try {
+    const { owner, repo } = req.query;
+    console.log(`[/api/pull-requests] Fetching PRs for ${owner}/${repo}`);
+    
+    if (!owner || !repo) {
+      console.error('[/api/pull-requests] Missing owner or repo');
+      return res.status(400).json({
+        status: 'error',
+        message: 'Owner and repo parameters are required'
+      });
+    }
+
+    const pullRequests = await getRepositoryPullRequests(owner, repo);
+    console.log('[/api/pull-requests] Response:', pullRequests);
+
+    res.json({
+      status: 'success',
+      data: pullRequests.data
+    });
+  } catch (error) {
+    console.error('[/api/pull-requests] Error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: `Failed to fetch pull requests: ${error.message}`
     });
   }
 });

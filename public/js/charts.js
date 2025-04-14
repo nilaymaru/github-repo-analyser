@@ -162,7 +162,106 @@ const languageColors = {
   Angular: '#dd1b16'
 };
 
+/**
+ * Create a donut chart
+ * @param {HTMLElement} canvas - Canvas element
+ * @param {Object} data - Chart data
+ * @param {Object} options - Chart options
+ */
+function createDonutChart(canvas, data, options = {}) {
+  const ctx = canvas.getContext('2d');
+  
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        data: data.data,
+        backgroundColor: data.colors || ['#4CAF50', '#F44336', '#2196F3', '#FF9800', '#9C27B0'],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#333',
+            font: {
+              size: 12
+            }
+          }
+        },
+        title: {
+          display: options.title ? true : false,
+          text: options.title || '',
+          font: {
+            size: 16
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Create a bar chart
+ * @param {HTMLElement} canvas - Canvas element
+ * @param {Object} data - Chart data
+ * @param {Object} options - Chart options
+ */
+function createBarChart(canvas, data, options = {}) {
+  const ctx = canvas.getContext('2d');
+  
+  return new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: options.label || 'Value',
+        data: data.data,
+        backgroundColor: data.colors || '#2196F3',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: options.yTitle ? true : false,
+            text: options.yTitle || ''
+          }
+        },
+        x: {
+          title: {
+            display: options.xTitle ? true : false,
+            text: options.xTitle || ''
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: options.showLegend !== false,
+          position: 'top'
+        },
+        title: {
+          display: options.title ? true : false,
+          text: options.title || ''
+        }
+      }
+    }
+  });
+}
+
 // Export functions
 window.createCommitChart = createCommitChart;
 window.createLanguagePieChart = createLanguagePieChart;
+window.createDonutChart = createDonutChart;
+window.createBarChart = createBarChart;
 window.languageColors = languageColors;

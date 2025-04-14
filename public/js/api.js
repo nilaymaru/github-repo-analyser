@@ -63,25 +63,23 @@ export const api = {
   getContributors: (owner, repo) => apiRequest(`/repos/${owner}/${repo}/contributors`),
   getCommits: (owner, repo) => {
     console.log(`[getCommits] Fetching commits for ${owner}/${repo}`);
-    try {
-      const response = apiRequest(`/api/commits?owner=${owner}&repo=${repo}`);
-      console.log('[getCommits] Raw API response:', response);
-      return response;
-    } catch (error) {
-      console.error('[getCommits] Error:', error);
-      throw error;
-    }
+    // Return the Promise directly, no need for try/catch here as it will be handled by the caller
+    return apiRequest(`/api/commits?owner=${owner}&repo=${repo}`);
   },
   getLanguages: (owner, repo) => {
     console.log(`Fetching languages for ${owner}/${repo}`);
-    try {
-      const response = apiRequest(`/api/languages?owner=${owner}&repo=${repo}`);
-      console.log('Language API response:', response);
-      return response;
-    } catch (error) {
-      console.error('Language fetch error:', error);
-      throw error;
-    }
+    // Return the Promise directly, no need for try/catch here as it will be handled by the caller
+    return apiRequest(`/api/languages?owner=${owner}&repo=${repo}`);
+  },
+  getIssues: (owner, repo) => {
+    console.log(`[getIssues] Fetching issues for ${owner}/${repo}`);
+    // Return the Promise directly, no need for try/catch here as it will be handled by the caller
+    return apiRequest(`/api/issues?owner=${owner}&repo=${repo}`);
+  },
+  getPullRequests: (owner, repo) => {
+    console.log(`[getPullRequests] Fetching PRs for ${owner}/${repo}`);
+    // Return the Promise directly, no need for try/catch here as it will be handled by the caller
+    return apiRequest(`/api/pull-requests?owner=${owner}&repo=${repo}`);
   },
   
   // Validation
