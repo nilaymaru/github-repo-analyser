@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Repository Analyzer</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/node_modules/chart.js/dist/chart.umd.js"></script>
+    <script type="module" src="/js/ui.js"></script>
+    <script type="module" src="/js/api.js"></script>
+</head>
+<body>
+    <nav class="top-bar">
+        <div class="top-bar__container">
+            <h1 class="top-bar__title">GitHub Repository Analyzer</h1>
+            <div class="top-bar__search">
+                <input type="text" id="repoInput" class="top-bar__input" placeholder="Enter GitHub repository URL">
+                <button class="top-bar__submit">Analyze</button>
+            </div>
+        </div>
+    </nav>
+
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar__header">
+            <h2 class="sidebar__title">GitHub Analyzer</h2>
+            <div class="sidebar__repo-placeholder">
+                <span class="sidebar__repo-owner">owner/</span>
+                <span class="sidebar__repo-name">repo</span>
+            </div>
+        </div>
+        <ul class="sidebar__nav">
+            <li class="sidebar__item">
+                <a href="#" class="sidebar__link sidebar__link--active">Home</a>
+            </li>
+            <li class="sidebar__item">
+                <a href="#" class="sidebar__link">Contributors</a>
+            </li>
+            <li class="sidebar__item">
+                <a href="#" class="sidebar__link">Commits</a>
+            </li>
+            <li class="sidebar__item">
+                <a href="#" class="sidebar__link">Languages</a>
+            </li>
+            <li class="sidebar__item">
+                <a href="#" class="sidebar__link">Files</a>
+            </li>
+        </ul>
+    </nav>
+    
+    <main class="main">
+        <button class="menu-toggle" id="menuToggle">
+            <span class="menu-toggle__icon">☰</span>
+        </button>
+        <div class="container">
+            <div id="app"></div>
+        </div>
+    </main>
+</body>
+</html>
