@@ -482,7 +482,14 @@ export async function getRepositoryCommits(owner, repo) {
     cacheMisses++;
     console.log(`Cache MISS for commits ${cacheKey}`);
 
-    const commits = await fetchAllCommits(owner, repo);
+    // Get first page of commits (100 commits)
+    const { data: commits } = await octokit.repos.listCommits({
+      owner,
+      repo,
+      per_page: 100,
+      page: 1
+    });
+
     console.log(`[getRepositoryCommits] Fetched ${commits.length} commits`);
 
     // Initialize frequency arrays
@@ -500,42 +507,39 @@ export async function getRepositoryCommits(owner, repo) {
       // Week (0 = Sunday, 6 = Saturday)
       frequencies.week[date.getDay()]++;
       
-      // Month (last 4 weeks)
-      const weekIndex = Math.floor((Date.now() - date) / (7 * 24 * 60 * 60 * 1000));
-      if (weekIndex < 4) frequencies.month[weekIndex]++;
+      // Month (0-3 for last 4 weeks)
+      const weeksAgo = Math.floor((new Date() - date) / (7 * 24 * 60 * 60 * 1000));
+      if (weeksAgo < 4) {
+        frequencies.month[weeksAgo]++;
+      }
       
-      // Year (by month)
-      const monthIndex = date.getMonth();
-      frequencies.year[monthIndex]++;
+      // Year (0-11 for months)
+      frequencies.year[date.getMonth()]++;
       
-      // Decade (last 10 years)
-      const yearIndex = new Date().getFullYear() - date.getFullYear();
-      if (yearIndex < 10) frequencies.decade[yearIndex]++;
+      // Decade (0-9 for years)
+      const yearsAgo = Math.floor((new Date() - date) / (365 * 24 * 60 * 60 * 1000));
+      if (yearsAgo < 10) {
+        frequencies.decade[yearsAgo]++;
+      }
     });
 
-    console.log('[getRepositoryCommits] Processed frequencies:', frequencies);
-
     const processedData = {
-      weekly: commits.slice(0, 10).map(c => ({
-        date: c.commit.author.date,
-        message: c.commit.message,
-        author: c.commit.author.name
+      weekly: commits.slice(0, 7).map(commit => ({
+        date: commit.commit.author.date,
+        author: commit.commit.author.name,
+        message: commit.commit.message
       })),
       total: commits.length,
       frequencies,
-      source: 'pagination'
+      source: 'api'
     };
 
     // Cache the processed data
     cache.set(cacheKey, processedData);
-    console.log('[getRepositoryCommits] Cached data:', processedData);
 
-    return {
-      data: processedData,
-      source: 'api'
-    };
+    return processedData;
   } catch (error) {
-    console.error('[getRepositoryCommits] Error:', error);
+    console.error(`[getRepositoryCommits] Error fetching commits:`, error);
     throw error;
   }
 }
@@ -598,7 +602,6 @@ async function getCommitStatistics(owner, repo) {
 
   return {
     weekly: commitActivity,
-    total: yearlyTotal,
     frequencies: {
       week: lastWeek,
       month: monthlyData,

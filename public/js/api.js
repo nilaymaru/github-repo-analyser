@@ -83,23 +83,6 @@ export const api = {
       throw error;
     }
   },
-  getFiles: async (owner, repo) => {
-    try {
-      console.log('[getFiles] Fetching files for', owner, repo);
-      const response = await apiRequest(`/api/files?owner=${owner}&repo=${repo}`);
-      console.log('[getFiles] Response:', response);
-      
-      if (!response.data) {
-        console.error('[getFiles] Invalid response data:', response);
-        throw new Error('Invalid response data');
-      }
-
-      return response;
-    } catch (error) {
-      console.error('[getFiles] Error:', error);
-      throw error;
-    }
-  },
   
   // Validation
   validate: (repo) => apiRequest(`/repos/validate?repo=${encodeURIComponent(repo)}`),

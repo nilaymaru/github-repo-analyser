@@ -229,7 +229,7 @@ function displayContributors(data) {
   sortButton.className = 'contributors__sort-button';
   sortButton.innerHTML = `
     <svg class="contributors__sort-icon" viewBox="0 0 24 24">
-      <path d="M16 17h2l-4-4 4-4v2H8v2h8v3zm-4-5V3H8v2h4v2H8v2h4v2H8v2h4v2H8v3h6v-8h-2z"/>
+      <path d="M16 17h2l-4-4 4-4v2H8v2h8v3zm-4-5V3H8v2h4v2H8v2h4v2H8v3h6v-8h-2z"/>
     </svg>
     Sort by ${isAscending ? 'Descending' : 'Ascending'}
   `;
@@ -338,14 +338,8 @@ function displayCommitFrequencies(response) {
   const container = document.createElement('div');
   container.className = 'commits';
   
-  // Add total commits
-  const totalEl = document.createElement('div');
-  totalEl.className = 'commits__total';
-  totalEl.textContent = `Total Commits: ${total?.toLocaleString() || 0}`;
-  container.appendChild(totalEl);
-
   // Recent commits section
-  if (weekly && weekly.length > 0) {
+  if (weekly && Array.isArray(weekly) && weekly.length > 0) {
     const recentSection = document.createElement('div');
     recentSection.className = 'commits__section';
     
@@ -370,17 +364,26 @@ function displayCommitFrequencies(response) {
     const tbody = document.createElement('tbody');
     weekly.forEach(commit => {
       const row = document.createElement('tr');
-      const date = new Date(commit.date);
+      const date = commit?.date ? new Date(commit.date) : new Date();
       row.innerHTML = `
         <td>${date.toLocaleDateString()}</td>
-        <td>${commit.author}</td>
-        <td>${commit.message}</td>
+        <td>${commit?.author || 'Unknown'}</td>
+        <td>${commit?.message || 'No message'}</td>
       `;
       tbody.appendChild(row);
     });
     recentTable.appendChild(tbody);
     recentSection.appendChild(recentTable);
     container.appendChild(recentSection);
+  } else {
+    // Show empty state if no commits
+    const emptySection = document.createElement('div');
+    emptySection.className = 'commits__section';
+    emptySection.innerHTML = `
+      <h2 class="commits__title">Recent Commits</h2>
+      <p class="commits__empty">No commits found in this repository</p>
+    `;
+    container.appendChild(emptySection);
   }
 
   // Frequency sections
@@ -579,106 +582,6 @@ function formatBytes(bytes) {
 }
 
 /**
- * Display repository file tree
- * @param {Object} response - API response containing file tree data
- */
-function displayFileTree(response) {
-  console.log('[displayFileTree] Raw response:', response);
-  
-  if (!response || !response.data) {
-    console.error('[displayFileTree] Invalid response:', response);
-    displayMessage('Failed to load file tree', 'error');
-    return;
-  }
-
-  const data = response.data;
-  console.log('[displayFileTree] Processed data:', data);
-
-  const app = document.querySelector('#app');
-  if (!app) {
-    console.error('[displayFileTree] App container not found');
-    return;
-  }
-
-  // Clear existing content
-  app.innerHTML = '';
-
-  // Create main container
-  const container = document.createElement('div');
-  container.className = 'files-container';
-  
-  // Create title
-  const title = document.createElement('h1');
-  title.textContent = 'Repository Files';
-  container.appendChild(title);
-
-  // Create file tree container
-  const treeContainer = document.createElement('div');
-  treeContainer.className = 'file-tree';
-  
-  // Create root item
-  if (data.children && data.children.length > 0) {
-    const rootItem = createTreeItem(data);
-    treeContainer.appendChild(rootItem);
-  } else {
-    const noFiles = document.createElement('div');
-    noFiles.className = 'file-tree__item';
-    noFiles.textContent = 'No files found';
-    treeContainer.appendChild(noFiles);
-  }
-  
-  container.appendChild(treeContainer);
-  app.appendChild(container);
-}
-
-/**
- * Create a tree item element
- * @param {Object} node - File tree node
- * @returns {HTMLElement} Tree item element
- */
-function createTreeItem(node) {
-  const item = document.createElement('div');
-  item.className = 'file-tree__item';
-  
-  // Create toggle if it's a directory
-  const toggle = document.createElement('div');
-  toggle.className = 'file-tree__toggle';
-  toggle.innerHTML = node.children && node.children.length > 0 ? '▼' : '▶';
-  item.appendChild(toggle);
-  
-  // Create icon
-  const icon = document.createElement('div');
-  icon.className = `file-tree__icon file-tree__icon--${node.type}`;
-  item.appendChild(icon);
-  
-  // Create name
-  const name = document.createElement('span');
-  name.className = 'file-tree__name';
-  name.textContent = node.name;
-  item.appendChild(name);
-  
-  // Add click handler for directories
-  if (node.children && node.children.length > 0) {
-    item.addEventListener('click', (e) => {
-      e.stopPropagation();
-      item.classList.toggle('file-tree__item--collapsed');
-      const toggle = item.querySelector('.file-tree__toggle');
-      toggle.innerHTML = item.classList.contains('file-tree__item--collapsed') ? '▶' : '▼';
-    });
-
-    // Add children
-    const children = document.createElement('div');
-    children.className = 'file-tree__children';
-    node.children.forEach(child => {
-      children.appendChild(createTreeItem(child));
-    });
-    item.appendChild(children);
-  }
-
-  return item;
-}
-
-/**
  * Update sidebar with repository information
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
@@ -775,11 +678,13 @@ function displayFiles(response) {
   
   // Create root item
   if (data.children && data.children.length > 0) {
-    const rootItem = createTreeItem(data);
+    const rootItem = createTreeItem(data, 0);
+    // Expand root by default
+    rootItem.classList.add('expanded');
     treeContainer.appendChild(rootItem);
   } else {
     const noFiles = document.createElement('div');
-    noFiles.className = 'file-tree__item';
+    noFiles.className = 'file-tree-item';
     noFiles.textContent = 'No files found';
     treeContainer.appendChild(noFiles);
   }

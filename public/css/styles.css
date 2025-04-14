@@ -952,77 +952,166 @@ p {
   color: var(--text-light);
 }
 
-/* File tree styles */
-.file-tree {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--text-light);
+/* File Tree Styles */
+.file-tree-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 1rem;
+  background-color: var(--card-bg);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
 }
 
-.file-tree__item {
+.file-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.file-tree-item {
   display: flex;
   align-items: center;
-  padding: 0.5rem;
-  margin: 0.25rem 0;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  --depth: 0;
+  padding-left: calc(1.5rem + (var(--depth) * 1.25rem));
 }
 
-.file-tree__item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+.file-tree-item:hover {
+  background-color: var(--hover-bg);
 }
 
-.file-tree__icon {
-  margin-right: 0.5rem;
-  width: 1rem;
-  height: 1rem;
+.file-tree-item.active {
+  background-color: var(--active-bg);
+}
+
+.file-tree-item.type-directory {
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
+.file-tree-item.type-file {
+  color: var(--text-color);
+}
+
+.file-tree-item .toggle {
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  position: absolute;
+  left: calc(0.75rem + (var(--depth) * 1.25rem));
 }
 
-.file-tree__icon--folder {
-  background: var(--primary);
+.file-tree-item .toggle::before {
+  content: '▶';
+  display: inline-block;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.file-tree-item.expanded .toggle::before {
+  transform: rotate(90deg);
+}
+
+.file-tree-item .icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.75rem;
+}
+
+.file-tree-item.type-directory .icon {
+  background: var(--accent-blue);
   border-radius: 3px;
 }
 
-.file-tree__icon--file {
-  background: var(--secondary);
+.file-tree-item.type-file .icon {
+  background: var(--text-muted);
   border-radius: 2px;
 }
 
-.file-tree__name {
+.file-tree-item .name {
   flex: 1;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 0.5rem;
 }
 
-.file-tree__toggle {
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-light);
-  opacity: 0.7;
-  transition: transform 0.2s ease;
+.file-tree-item .size {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
 }
 
-.file-tree__toggle:hover {
-  opacity: 1;
-}
-
-.file-tree__item--collapsed .file-tree__toggle {
-  transform: rotate(-90deg);
-}
-
-.file-tree__children {
-  margin-left: 1rem;
-  padding-left: 0.5rem;
+.file-tree-children {
+  margin-left: 0;
+  padding-left: 0;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: none;
+}
+
+.file-tree-item.expanded .file-tree-children {
+  display: block;
+}
+
+.file-tree::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-tree::-webkit-scrollbar-track {
+  background: var(--card-bg);
+}
+
+.file-tree::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}
+
+.file-tree::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color);
+}
+
+@media (max-width: 768px) {
+  .file-tree-container {
+    margin: 1rem;
+    padding: 0.5rem;
+  }
+  
+  .file-tree-item {
+    padding: 0.5rem 0.5rem;
+    --depth: 0;
+    padding-left: calc(1rem + (var(--depth) * 1rem));
+  }
+  
+  .file-tree-item .toggle {
+    left: calc(0.5rem + (var(--depth) * 1rem));
+  }
+  
+  .file-tree {
+    max-height: calc(100vh - 150px);
+  }
+  
+  .file-tree-children {
+    margin-left: 0;
+    padding-left: 0;
+  }
 }
 
 .files-container {
@@ -1111,4 +1200,9 @@ p {
   margin-left: 1rem;
   padding-left: 0.5rem;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
+  display: none;
+}
+
+.file-tree__item.expanded .file-tree__children {
+  display: block;
 }
