@@ -2,8 +2,6 @@
 
 A powerful tool for analyzing GitHub repositories, providing insights into code structure, contributor activity, and repository metrics.
 
-![GitHub Repository Analyzer](https://via.placeholder.com/800x400?text=GitHub+Repository+Analyzer)
-
 ## Features
 
 - **Repository Analysis**: Get detailed metrics and insights about any GitHub repository
